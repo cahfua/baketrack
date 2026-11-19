@@ -1,7 +1,96 @@
 ﻿@page "/"
 
-<PageTitle>Home</PageTitle>
+<PageTitle>Dashboard | BakeTrack</PageTitle>
 
-<h1>Hello, world!</h1>
+<div class="dashboard">
 
-Welcome to your new app.
+    <div class="dashboard-header">
+        <div>
+            <h1>Dashboard</h1>
+            <p>Welcome to BakeTrack. Here's an overview of your bakery.</p>
+        </div>
+    </div>
+
+    <div class="row g-4 mt-2">
+
+        <div class="col-md-6 col-xl-3">
+            <div class="dashboard-card">
+                <div class="card-icon">
+                    <i class="bi bi-box-seam"></i>
+                </div>
+                <h3>Ingredients</h3>
+                <p class="card-value">0</p>
+                <span>Total ingredients tracked</span>
+            </div>
+        </div>
+
+        <div class="col-md-6 col-xl-3">
+            <div class="dashboard-card">
+                <div class="card-icon">
+                    <i class="bi bi-exclamation-triangle"></i>
+                </div>
+                <h3>Low Stock</h3>
+                <p class="card-value">0</p>
+                <span>Ingredients needing attention</span>
+            </div>
+        </div>
+
+        <div class="col-md-6 col-xl-3">
+            <div class="dashboard-card">
+                <div class="card-icon">
+                    <i class="bi bi-basket"></i>
+                </div>
+                <h3>Products</h3>
+                <p class="card-value">0</p>
+                <span>Products registered</span>
+            </div>
+        </div>
+
+        <div class="col-md-6 col-xl-3">
+            <div class="dashboard-card">
+                <div class="card-icon">
+                    <i class="bi bi-clipboard-check"></i>
+                </div>
+                <h3>Production</h3>
+                <p class="card-value">0</p>
+                <span>Items produced today</span>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="dashboard-section mt-5">
+        <h2>Getting Started</h2>
+        <p>Use the navigation menu to manage your bakery operations.</p>
+
+        <div class="row g-3 mt-2">
+            <div class="col-md-4">
+                <div class="quick-link">
+                    <i class="bi bi-box-seam"></i>
+                    <h4>Manage Ingredients</h4>
+                    <p>Add ingredients and monitor stock levels.</p>
+                    <a href="/ingredients">View Ingredients →</a>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="quick-link">
+                    <i class="bi bi-bag"></i>
+                    <h4>Manage Products</h4>
+                    <p>Manage bakery products and their recipes.</p>
+                    <a href="/products">View Products →</a>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="quick-link">
+                    <i class="bi bi-clipboard-check"></i>
+                    <h4>Track Production</h4>
+                    <p>Record daily bakery production.</p>
+                    <a href="/production">View Production →</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>

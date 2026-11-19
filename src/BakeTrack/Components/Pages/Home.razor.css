@@ -1,0 +1,85 @@
+.dashboard {
+    padding-bottom: 2rem;
+}
+
+.dashboard-header {
+    margin-bottom: 1.5rem;
+}
+
+.dashboard-header p,
+.dashboard-section>p {
+    color: #6c757d;
+}
+
+.dashboard-card,
+.quick-link {
+    height: 100%;
+    padding: 1.5rem;
+    background: #ffffff;
+    border: 1px solid #e5e5e5;
+    border-radius: 12px;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.dashboard-card:hover,
+.quick-link:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 5px 18px rgba(0, 0, 0, 0.08);
+}
+
+.card-icon {
+    color: #b58b4c;
+    font-size: 1.6rem;
+    margin-bottom: 1rem;
+}
+
+.dashboard-card h3 {
+    font-size: 1rem;
+    color: #6c757d;
+    margin-bottom: 0.5rem;
+}
+
+.card-value {
+    font-size: 2rem;
+    font-weight: 700;
+    margin-bottom: 0.25rem;
+}
+
+.dashboard-card span {
+    color: #777777;
+    font-size: 0.85rem;
+}
+
+.dashboard-section {
+    margin-top: 3rem;
+}
+
+.dashboard-section h2 {
+    font-size: 1.5rem;
+    font-weight: 600;
+}
+
+.quick-link>i {
+    color: #b58b4c;
+    font-size: 1.5rem;
+}
+
+.quick-link h4 {
+    font-size: 1.1rem;
+    margin-top: 1rem;
+}
+
+.quick-link p {
+    color: #6c757d;
+    font-size: 0.9rem;
+}
+
+.quick-link a {
+    color: #9a7138;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.quick-link a:hover {
+    text-decoration: underline;
+}
