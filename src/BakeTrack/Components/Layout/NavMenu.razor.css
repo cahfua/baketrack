@@ -1,0 +1,139 @@
+
+/* BakeTrack Navigation */
+
+.navbar-toggler {
+    appearance: none;
+    cursor: pointer;
+    width: 3rem;
+    height: 2.5rem;
+    position: absolute;
+    top: 0.5rem;
+    right: 1rem;
+    border: 1px solid #41474b;
+    border-radius: 8px;
+    background: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='%23f1e6d7' stroke-linecap='round' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e") no-repeat center/1.5rem #292f33;
+}
+
+.navbar-toggler:checked {
+    background-color: #464039;
+}
+
+.top-row {
+    min-height: 4rem;
+    background: #171c20;
+    display: flex;
+    align-items: center;
+    border-bottom: 1px solid #32383c;
+}
+
+.navbar-brand {
+    color: #f8f5ef !important;
+    font-size: 1.35rem;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    text-decoration: none;
+}
+
+/* Navigation */
+
+.nav-scrollable {
+    display: none;
+    background-color: #171c20;
+}
+
+.nav-item {
+    font-size: 0.925rem;
+    padding: 0.2rem 0.75rem;
+}
+
+.nav-item:first-of-type {
+    padding-top: 1.5rem;
+}
+
+.nav-item:last-of-type {
+    padding-bottom: 1rem;
+}
+
+.nav-item ::deep .nav-link {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    min-height: 2.9rem;
+    padding: 0.7rem 1rem;
+    width: 100%;
+
+    color: #aab2b5;
+    font-weight: 500;
+    text-decoration: none;
+
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 8px;
+
+    transition: background-color 0.2s ease,
+                color 0.2s ease,
+                border-color 0.2s ease;
+}
+
+/* Hover */
+
+.nav-item ::deep .nav-link:hover {
+    background-color: #292f33;
+    color: #ffffff;
+}
+
+/* Active page */
+
+.nav-item ::deep .nav-link.active {
+    background-color: #3b342c;
+    border: 1px solid #c9a66b;
+    color: #f0ce9b;
+    font-weight: 600;
+}
+
+/* Icons */
+
+.nav-item ::deep .nav-link svg {
+    width: 19px;
+    height: 19px;
+    flex-shrink: 0;
+    opacity: 0.8;
+}
+
+.nav-item ::deep .nav-link.active svg {
+    opacity: 1;
+}
+
+/* Keyboard navigation */
+
+.nav-item ::deep .nav-link:focus-visible {
+    outline: 2px solid #edc58d;
+    outline-offset: 2px;
+}
+
+/* Mobile navigation */
+
+.navbar-toggler:checked ~ .nav-scrollable {
+    display: block;
+}
+
+/* Desktop */
+
+@media (min-width: 641px) {
+    .navbar-toggler {
+        display: none;
+    }
+
+    .nav-scrollable {
+        display: block;
+        height: calc(100vh - 4rem);
+        overflow-y: auto;
+        padding-top: 0.5rem;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .nav-item ::deep .nav-link {
+        transition: none;
+    }
+}
