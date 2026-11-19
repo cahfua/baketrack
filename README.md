@@ -1,34 +1,33 @@
 # BakeTrack
 
-Bakery inventory and production management system for the CSE 499 team project.
+Bakery Inventory and Production Management System for the CSE 499 team project.
 
 ## Project Overview
 
-BakeTrack is a web application designed to help small bakeries manage ingredients, monitor inventory levels, organize products and recipes, and track daily production.
+BakeTrack is a web application designed to help small bakeries manage ingredients, monitor inventory levels, organise products and recipes, and track daily production.
 
-### Core Features
+## Core Features
 
 - **Ingredient Management:** Add, edit, and manage bakery ingredients.
 - **Stock Level Monitoring:** Track ingredient quantities and identify low-stock items.
 - **Product Management:** Manage bakery products and their associated recipes.
 - **Daily Production Tracking:** Record daily production and track ingredient usage.
 
-### Planned Enhancements
+## Planned Enhancements
 
-- Search and filtering
-- Ingredient expiration date monitoring
-- Waste management and reporting
+- Search and filtering.
+- Ingredient expiry date monitoring.
+- Waste management and reporting.
 
 ## Technology Stack
 
 - **Framework:** ASP.NET Core / Blazor
 - **Language:** C#
-- **Database:** PostgreSQL (hosted on Render)
+- **Database:** SQLite
 - **ORM:** Entity Framework Core
 - **Frontend:** HTML, CSS, Bootstrap
 - **Version Control:** Git and GitHub
 - **Development Environment:** Visual Studio Code or Visual Studio
-- **Hosting:** Render (planned)
 
 ## Getting Started
 
@@ -38,137 +37,143 @@ Follow these instructions to set up BakeTrack on your local machine.
 
 Install the following software:
 
-- .NET 10 SDK: https://dotnet.microsoft.com/download/dotnet/10.0
-- Visual Studio Code: https://code.visualstudio.com/
-- Git: https://git-scm.com/downloads
+- [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
+- [Visual Studio Code](https://code.visualstudio.com/)
+- [Git](https://git-scm.com/downloads)
 
-If using VS Code, install the C# Dev Kit extension:
-
-https://marketplace.visualstudio.com/items?itemName=ms-dotnettools.csdevkit
+If using VS Code, install the [C# Dev Kit extension](https://marketplace.visualstudio.com/items?itemName=ms-dotnettools.csdevkit).
 
 ### 2. Clone the Repository
 
 Open a terminal and run:
 
-
+```bash
 git clone https://github.com/cahfua/baketrack.git
 cd baketrack
-
+```
 
 Open the project in VS Code:
 
-
+```bash
 code .
+```
 
+### 3. Navigate to the Application Directory
 
-### 3. Install Project Dependencies
+Run:
 
-Navigate to the application directory:
-
-
+```bash
 cd src/BakeTrack
+```
 
+### 4. Restore Project Dependencies
 
 Restore the required NuGet packages:
 
-
+```bash
 dotnet restore
+```
 
-
-This will automatically install the dependencies defined in `BakeTrack.csproj`, including Entity Framework Core and the PostgreSQL provider.
+This installs the dependencies defined in `BakeTrack.csproj`, including Entity Framework Core and the SQLite database provider.
 
 You do not need to install these packages individually.
 
-### 4. Configure the Database Connection
+### 5. Set Up the Local SQLite Database
 
-BakeTrack uses a shared PostgreSQL database hosted on Render.
+BakeTrack uses SQLite with Entity Framework Core. Each team member maintains their own local database.
 
-Contact the project administrator to obtain the development database credentials.
+First, install the Entity Framework Core command-line tool if it is not already installed:
 
-The connection string is stored locally using .NET User Secrets to prevent sensitive information from being committed to GitHub.
+```bash
+dotnet tool install --global dotnet-ef --version "10.*"
+```
 
-Initialize User Secrets:
+If it is already installed, update it when necessary:
 
+```bash
+dotnet tool update --global dotnet-ef --version "10.*"
+```
 
-dotnet user-secrets init
+Create your local database by running:
 
+```bash
+dotnet ef database update
+```
 
-Configure the connection string:
-ASK OWEN FOR VALUES FOR THIS STRING!!!
-
-dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Host=YOUR_HOST;Port=5432;Database=YOUR_DATABASE;Username=YOUR_USERNAME;Password=YOUR_PASSWORD;SSL Mode=Require"
-
-
-Replace the placeholders with the credentials provided by the project administrator.
+This command applies the existing migrations and creates a local database file named `Bakery.db` in the application directory.
 
 **Important:**
 
-- Use the Render external database hostname when developing locally.
-- Never commit passwords or connection strings containing credentials to GitHub.
-- Do not share database credentials in GitHub issues or pull requests.
-- Use development credentials rather than production credentials whenever possible.
+- Each developer creates and maintains their own local database.
+- The `Bakery.db` file is excluded from GitHub through `.gitignore`.
+- Do not commit or push your local database file.
+- Migration files must be committed to GitHub so all developers use the same database structure.
+- When new migrations are added by the team, pull the latest changes and run `dotnet ef database update` again.
 
-### 5. Build and Run the Application
+### 6. Build and Run the Application
 
 From the `src/BakeTrack` directory, build the project:
 
-
+```bash
 dotnet build
-
+```
 
 Start the application:
 
-
+```bash
 dotnet run
-
+```
 
 The terminal will display a local URL similar to:
 
+```text
+https://localhost:5001
+```
 
-https://localhost:5285
-
-
-Open the URL shown in your terminal to access BakeTrack.
+Open the URL displayed in your terminal to access BakeTrack.
 
 For automatic rebuilding during development, use:
 
-
+```bash
 dotnet watch run
+```
 
-
-### 6. Database Migrations
+### 7. Database Migrations
 
 BakeTrack uses Entity Framework Core migrations to manage database schema changes.
 
-Install the EF Core command-line tool if it is not already installed:
-
-
-dotnet tool install --global dotnet-ef --version "10.*"
-
-
 To check existing migrations:
 
-
+```bash
 dotnet ef migrations list
+```
 
-
-The initial database migration has already been created and applied to the shared development database.
-
-Team members should not create or apply new migrations unless their changes require modifications to the database schema.
-
-When a schema change is necessary:
+When a database schema change is necessary:
 
 1. Coordinate the change with the team.
 2. Update the relevant model classes and database context.
-3. Generate a migration using `dotnet ef migrations add MigrationName`.
-4. Review the migration before applying it.
-5. Have the designated team member apply it to the shared database.
+3. Generate a migration:
 
-The migration files must be committed to GitHub so every developer has the same database schema.
+   ```bash
+   dotnet ef migrations add MigrationName
+   ```
 
-### 7. Project Structure
+4. Review the generated migration.
+5. Apply the migration to your local database:
 
+   ```bash
+   dotnet ef database update
+   ```
 
+6. Commit and push the migration files to GitHub through your feature branch.
+
+Other team members should pull the latest changes and run `dotnet ef database update` to apply the new migration to their local databases.
+
+Avoid creating duplicate migrations or changing the database schema without coordinating with the team.
+
+## Project Structure
+
+```text
 baketrack/
 ├── docs/
 ├── src/
@@ -177,6 +182,7 @@ baketrack/
 │       │   ├── Layout/
 │       │   └── Pages/
 │       ├── Data/
+│       ├── Migrations/
 │       ├── Models/
 │       ├── Services/
 │       ├── wwwroot/
@@ -185,7 +191,7 @@ baketrack/
 │       └── BakeTrack.csproj
 ├── .gitignore
 └── README.md
-
+```
 
 ## GitHub Workflow
 
@@ -193,39 +199,39 @@ To avoid conflicts when multiple people are working on the project, use feature 
 
 ### 1. Create a Feature Branch
 
-Before starting work, make sure your local `main` branch is up to date:
+Before starting work, update your local `main` branch:
 
-
+```bash
 git switch main
 git pull origin main
-
+```
 
 Create a new branch:
 
-
+```bash
 git switch -c feature/your-feature-name
-
+```
 
 For example:
 
-
+```bash
 git switch -c feature/ingredient-management
-
+```
 
 ### 2. Make and Commit Changes
 
 After completing your work:
 
-
+```bash
 git add .
 git commit -m "Add ingredient management functionality"
-
+```
 
 ### 3. Push Changes to GitHub
 
-
+```bash
 git push -u origin feature/ingredient-management
-
+```
 
 Open a pull request on GitHub to merge your changes into `main`.
 
@@ -235,10 +241,10 @@ Another team member should review the changes before merging.
 
 If other changes have been merged into `main`, update your feature branch:
 
-
+```bash
 git fetch origin
 git merge origin/main
-
+```
 
 Resolve any merge conflicts before continuing.
 
@@ -250,10 +256,10 @@ Resolve any merge conflicts before continuing.
 - Keep Blazor pages focused on the user interface.
 - Coordinate database schema changes with the rest of the team.
 - Verify that `dotnet build` succeeds before creating a pull request.
-- Never commit passwords, API keys, or other sensitive credentials.
+- Never commit passwords, API keys, or other sensitive information.
 - Avoid unnecessary dependencies or major architectural changes without discussing them with the team.
 
-## Team Quotes
+## Team Quote
 
 > Don't let today's shadow of failure affect tomorrow's light of success.  
 > — Celestine Ahfua
