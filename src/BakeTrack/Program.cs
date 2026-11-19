@@ -1,55 +1,42 @@
+
 using BakeTrack.Data;
-using Microsoft.EntityFrameworkCore;
 using BakeTrack.Components;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
+// Register Blazor services.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
+// Configure Entity Framework Core to use SQLite.
 builder.Services.AddDbContextFactory<BakeryDbContext>(
-    options => options.UseNpgsql(
-        builder.Configuration.GetConnectionString(
-            "DefaultConnection"
-        )
+    options => options.UseSqlite(
+        builder.Configuration.GetConnectionString("DefaultConnection")
     )
 );
 
 var app = builder.Build();
 
-// Temporary database connection test
-try
-{
-    await using var db = await app.Services
-        .GetRequiredService<IDbContextFactory<BakeryDbContext>>()
-        .CreateDbContextAsync();
-
-    await db.Database.OpenConnectionAsync();
-
-    Console.WriteLine("SUCCESS: Connected to Render PostgreSQL!");
-
-    await db.Database.CloseConnectionAsync();
-}
-catch (Exception ex)
-{
-    Console.WriteLine("DATABASE CONNECTION FAILED:");
-    Console.WriteLine(ex.ToString());
-}
-// Configure the HTTP request pipeline.
+// Configure error handling and security for production.
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
     app.UseHsts();
 }
-app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
-app.UseHttpsRedirection();
 
+app.UseStatusCodePagesWithReExecute(
+    "/not-found",
+    createScopeForStatusCodePages: true
+);
+
+app.UseHttpsRedirection();
 app.UseAntiforgery();
 
+// Serve static assets and configure Blazor components.
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
+// Start the application.
 app.Run();

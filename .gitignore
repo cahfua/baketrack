@@ -426,3 +426,8 @@ FodyWeavers.xsd
 
 # Official VS Code C# Dev Kit Extension exclusion
 #*.lscache
+
+# Local SQLite database files
+/src/BakeTrack/Bakery.db
+/src/BakeTrack/Bakery.db-shm
+/src/BakeTrack/Bakery.db-wal
