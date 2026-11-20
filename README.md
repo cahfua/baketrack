@@ -21,11 +21,12 @@ BakeTrack is a web application designed to help small bakeries manage ingredient
 
 ## Technology Stack
 
-- **Framework:** ASP.NET Core / Blazor
-- **Language:** C#
-- **Database:** SQLite
-- **ORM:** Entity Framework Core
+- **Framework:** ASP.NET Core / Blazor (Interactive Server)
+- **Language:** C# (.NET 10)
+- **Database:** PostgreSQL
+- **ORM:** Entity Framework Core + Npgsql
 - **Frontend:** HTML, CSS, Bootstrap
+- **Deployment:** Docker + Render.com
 - **Version Control:** Git and GitHub
 - **Development Environment:** Visual Studio Code or Visual Studio
 
@@ -74,13 +75,45 @@ Restore the required NuGet packages:
 dotnet restore
 ```
 
-This installs the dependencies defined in `BakeTrack.csproj`, including Entity Framework Core and the SQLite database provider.
+This installs the dependencies defined in `BakeTrack.csproj`, including Entity Framework Core and the Npgsql PostgreSQL provider.
 
 You do not need to install these packages individually.
 
-### 5. Set Up the Local SQLite Database
+### 5. Set Up Your Local PostgreSQL Database
 
-BakeTrack uses SQLite with Entity Framework Core. Each team member maintains their own local database.
+BakeTrack uses **PostgreSQL** with Entity Framework Core. Each team member uses their own local PostgreSQL database via **.NET User Secrets**, so personal credentials are never committed to GitHub and local development never points to the production Render database.
+
+Choose **one** of the two local options below:
+
+#### Option A: You already have PostgreSQL installed locally
+
+1. Create an empty local database (for example, `baketrack`):
+
+   ```sql
+   CREATE DATABASE baketrack;
+   ```
+
+2. Save your personal local connection string in .NET User Secrets (from the repository root or `src/BakeTrack`):
+
+   ```bash
+   dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Host=localhost;Port=5432;Database=baketrack;Username=YOUR_USER;Password=YOUR_PASSWORD" --project src/BakeTrack
+   ```
+
+#### Option B: Use the included Docker PostgreSQL container
+
+If you do not have PostgreSQL installed locally, start the development database with Docker:
+
+```bash
+docker compose up -d
+```
+
+Then save the matching local connection string in .NET User Secrets:
+
+```bash
+dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Host=localhost;Port=5432;Database=baketrack;Username=baketrack;Password=baketrack_dev" --project src/BakeTrack
+```
+
+#### Apply Database Migrations
 
 First, install the Entity Framework Core command-line tool if it is not already installed:
 
@@ -94,21 +127,21 @@ If it is already installed, update it when necessary:
 dotnet tool update --global dotnet-ef --version "10.*"
 ```
 
-Create your local database by running:
+Apply the existing migrations to your local PostgreSQL database:
 
 ```bash
 dotnet ef database update
 ```
 
-This command applies the existing migrations and creates a local database file named `Bakery.db` in the application directory.
+*(Migrations also run automatically when the application starts.)*
 
 **Important:**
 
-- Each developer creates and maintains their own local database.
-- The `Bakery.db` file is excluded from GitHub through `.gitignore`.
-- Do not commit or push your local database file.
-- Migration files must be committed to GitHub so all developers use the same database structure.
-- When new migrations are added by the team, pull the latest changes and run `dotnet ef database update` again.
+- Each developer creates and maintains their own local PostgreSQL database via `dotnet user-secrets`.
+- Never commit passwords or connection strings to `appsettings.json` or `appsettings.Development.json`.
+- In `Development` mode, `DATABASE_URL` is ignored and Render hostnames are blocked so local runs never connect to production.
+- Migration files must be committed to GitHub so all developers and production use the same database structure.
+- When new migrations are added by the team, pull the latest changes and run `dotnet ef database update` (or restart the app).
 
 ### 6. Build and Run the Application
 
@@ -127,7 +160,7 @@ dotnet run
 The terminal will display a local URL similar to:
 
 ```text
-https://localhost:5001
+http://localhost:5285
 ```
 
 Open the URL displayed in your terminal to access BakeTrack.
@@ -138,7 +171,16 @@ For automatic rebuilding during development, use:
 dotnet watch run
 ```
 
-### 7. Database Migrations
+### 7. Deploying to Render.com
+
+The repository includes a `Dockerfile` and a `render.yaml` Blueprint for Render.com:
+
+1. Push your branch/repository to GitHub.
+2. In Render, choose **New + -> Blueprint** and select this repository (or create a **PostgreSQL** service and a **Docker Web Service** manually).
+3. Link the Render PostgreSQL `DATABASE_URL` environment variable to the web service and set `ASPNETCORE_ENVIRONMENT=Production`.
+4. Render will build the Docker container, check `/health`, and apply pending EF Core migrations automatically on startup.
+
+### 8. Database Migrations
 
 BakeTrack uses Entity Framework Core migrations to manage database schema changes.
 
