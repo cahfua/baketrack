@@ -1,4 +1,6 @@
-﻿@page "/"
+@page "/"
+@using BakeTrack.Services
+@inject DashboardService DashboardService
 
 <PageTitle>Dashboard | BakeTrack</PageTitle>
 
@@ -11,6 +13,13 @@
         </div>
     </div>
 
+    @if (!string.IsNullOrEmpty(loadError))
+    {
+        <div class="alert alert-danger" role="alert">
+            @loadError
+        </div>
+    }
+
     <div class="row g-4 mt-2">
 
         <div class="col-md-6 col-xl-3">
@@ -19,7 +28,7 @@
                     <i class="bi bi-box-seam"></i>
                 </div>
                 <h3>Ingredients</h3>
-                <p class="card-value">0</p>
+                <p class="card-value">@summary.TotalIngredients</p>
                 <span>Total ingredients tracked</span>
             </div>
         </div>
@@ -30,7 +39,7 @@
                     <i class="bi bi-exclamation-triangle"></i>
                 </div>
                 <h3>Low Stock</h3>
-                <p class="card-value">0</p>
+                <p class="card-value">@summary.LowStockCount</p>
                 <span>Ingredients needing attention</span>
             </div>
         </div>
@@ -41,7 +50,7 @@
                     <i class="bi bi-basket"></i>
                 </div>
                 <h3>Products</h3>
-                <p class="card-value">0</p>
+                <p class="card-value">@summary.TotalProducts</p>
                 <span>Products registered</span>
             </div>
         </div>
@@ -52,7 +61,7 @@
                     <i class="bi bi-clipboard-check"></i>
                 </div>
                 <h3>Production</h3>
-                <p class="card-value">0</p>
+                <p class="card-value">@summary.TodayProductionCount</p>
                 <span>Items produced today</span>
             </div>
         </div>
@@ -94,3 +103,20 @@
     </div>
 
 </div>
+
+@code {
+    private DashboardSummary summary = new(0, 0, 0, 0);
+    private string? loadError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            summary = await DashboardService.GetSummaryAsync();
+        }
+        catch (Exception)
+        {
+            loadError = "Unable to load bakery metrics from the database right now.";
+        }
+    }
+}

@@ -1,5 +1,6 @@
 using BakeTrack.Components;
 using BakeTrack.Data;
+using BakeTrack.Services;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 
@@ -31,6 +32,7 @@ var connectionString = DatabaseConfiguration.ResolveConnectionString(
 builder.Services.AddDbContextFactory<BakeryDbContext>(
     options => options.UseNpgsql(connectionString));
 
+builder.Services.AddScoped<DashboardService>();
 
 var app = builder.Build();
 
