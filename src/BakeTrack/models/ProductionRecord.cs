@@ -10,4 +10,7 @@ public class ProductionRecord
 
     public int QuantityProduced { get; set; }
     public DateTime ProductionDate { get; set; } = DateTime.UtcNow;
+
+    public string? RecordedByUserId { get; set; }
+    public ApplicationUser? RecordedByUser { get; set; }
 }

@@ -11,4 +11,7 @@ public class InventoryTransaction
     public decimal QuantityChange { get; set; }
     public string Reason { get; set; } = string.Empty;
     public DateTime Date { get; set; } = DateTime.UtcNow;
+
+    public string? RecordedByUserId { get; set; }
+    public ApplicationUser? RecordedByUser { get; set; }
 }
