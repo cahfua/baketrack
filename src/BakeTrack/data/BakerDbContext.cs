@@ -1,4 +1,3 @@
-
 using Microsoft.EntityFrameworkCore;
 using BakeTrack.Models;
 
@@ -20,26 +19,42 @@ public class BakeryDbContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        modelBuilder.Entity<RecipeIngredient>()
-            .HasIndex(r => new { r.ProductId, r.IngredientId })
-            .IsUnique();
+        modelBuilder.Entity<Ingredient>(entity =>
+        {
+            entity.Property(i => i.QuantityInStock).HasPrecision(18, 3);
+            entity.Property(i => i.LowStockThreshold).HasPrecision(18, 3);
+        });
 
-        modelBuilder.Entity<RecipeIngredient>()
-            .HasOne(r => r.Ingredient)
-            .WithMany(i => i.RecipeIngredients)
-            .HasForeignKey(r => r.IngredientId)
-            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<Product>(entity =>
+        {
+            entity.Property(p => p.Price).HasPrecision(18, 2);
+        });
 
-        modelBuilder.Entity<ProductionRecord>()
-            .HasOne(r => r.Product)
-            .WithMany(p => p.ProductionRecords)
-            .HasForeignKey(r => r.ProductId)
-            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<RecipeIngredient>(entity =>
+        {
+            entity.Property(r => r.QuantityRequired).HasPrecision(18, 3);
+            entity.HasIndex(r => new { r.ProductId, r.IngredientId }).IsUnique();
+            entity.HasOne(r => r.Ingredient)
+                .WithMany(i => i.RecipeIngredients)
+                .HasForeignKey(r => r.IngredientId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
 
-        modelBuilder.Entity<InventoryTransaction>()
-            .HasOne(t => t.Ingredient)
-            .WithMany(i => i.InventoryTransactions)
-            .HasForeignKey(t => t.IngredientId)
-            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<ProductionRecord>(entity =>
+        {
+            entity.HasOne(r => r.Product)
+                .WithMany(p => p.ProductionRecords)
+                .HasForeignKey(r => r.ProductId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<InventoryTransaction>(entity =>
+        {
+            entity.Property(t => t.QuantityChange).HasPrecision(18, 3);
+            entity.HasOne(t => t.Ingredient)
+                .WithMany(i => i.InventoryTransactions)
+                .HasForeignKey(t => t.IngredientId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
     }
 }
