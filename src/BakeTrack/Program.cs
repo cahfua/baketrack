@@ -33,6 +33,7 @@ builder.Services.AddDbContextFactory<BakeryDbContext>(
     options => options.UseNpgsql(connectionString));
 
 builder.Services.AddScoped<DashboardService>();
+builder.Services.AddScoped<IngredientService>();
 
 var app = builder.Build();
 
