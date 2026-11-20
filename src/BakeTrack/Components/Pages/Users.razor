@@ -1,0 +1,500 @@
+@page "/users"
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = AppRoles.Admin)]
+@using System.Security.Claims
+@inject UserManagementService UserManagementService
+
+<PageTitle>Users | BakeTrack</PageTitle>
+
+<div class="container-fluid px-0 pb-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+        <div>
+            <h1 class="mb-1">User Management</h1>
+            <p class="text-muted mb-0">Create bakery accounts, assign roles, and manage access.</p>
+        </div>
+        @if (activePanel == PanelMode.None)
+        {
+            <button type="button" class="btn btn-primary" @onclick="StartCreate">
+                <i class="bi bi-person-plus me-1"></i> Add User
+            </button>
+        }
+    </div>
+
+    @if (!string.IsNullOrEmpty(statusMessage))
+    {
+        <div class="alert @(statusIsError ? "alert-danger" : "alert-success") alert-dismissible fade show" role="alert">
+            @statusMessage
+            <button type="button" class="btn-close" aria-label="Close" @onclick="ClearStatus"></button>
+        </div>
+    }
+
+    @if (activePanel == PanelMode.Create)
+    {
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h2 class="h5 mb-0">Create New User</h2>
+                <button type="button" class="btn-close" aria-label="Close form" @onclick="ClosePanels"></button>
+            </div>
+            <div class="card-body">
+                <EditForm Model="createModel" OnValidSubmit="HandleCreateAsync" FormName="CreateUserForm">
+                    <DataAnnotationsValidator />
+
+                    @if (!string.IsNullOrEmpty(panelError))
+                    {
+                        <div class="alert alert-danger" role="alert">@panelError</div>
+                    }
+
+                    <div class="row g-3">
+                        <div class="col-12 col-md-6">
+                            <label for="create-fullname" class="form-label">Full Name <span class="text-danger">*</span></label>
+                            <InputText id="create-fullname" class="form-control" @bind-Value="createModel.FullName" placeholder="e.g., Maria Lopez" />
+                            <ValidationMessage For="() => createModel.FullName" />
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label for="create-email" class="form-label">Email <span class="text-danger">*</span></label>
+                            <InputText id="create-email" class="form-control" @bind-Value="createModel.Email" placeholder="e.g., maria@baketrack.local" />
+                            <ValidationMessage For="() => createModel.Email" />
+                        </div>
+
+                        <div class="col-12 col-md-4">
+                            <label for="create-role" class="form-label">Role <span class="text-danger">*</span></label>
+                            <InputSelect id="create-role" class="form-select" @bind-Value="createModel.Role">
+                                <option value="@AppRoles.Staff">Staff (Operations)</option>
+                                <option value="@AppRoles.Admin">Admin (Full Access)</option>
+                            </InputSelect>
+                            <ValidationMessage For="() => createModel.Role" />
+                        </div>
+
+                        <div class="col-12 col-md-4">
+                            <label for="create-password" class="form-label">Temporary Password <span class="text-danger">*</span></label>
+                            <InputText id="create-password" type="password" class="form-control" @bind-Value="createModel.Password" />
+                            <ValidationMessage For="() => createModel.Password" />
+                        </div>
+
+                        <div class="col-12 col-md-4">
+                            <label for="create-confirm" class="form-label">Confirm Password <span class="text-danger">*</span></label>
+                            <InputText id="create-confirm" type="password" class="form-control" @bind-Value="createModel.ConfirmPassword" />
+                            <ValidationMessage For="() => createModel.ConfirmPassword" />
+                        </div>
+                    </div>
+
+                    <div class="form-text mt-2">
+                        Passwords must be at least 8 characters and include uppercase, lowercase, and a number.
+                    </div>
+
+                    <div class="d-flex flex-wrap gap-2 mt-4">
+                        <button type="submit" class="btn btn-primary" disabled="@isSaving">
+                            @(isSaving ? "Creating..." : "Create User")
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" @onclick="ClosePanels" disabled="@isSaving">
+                            Cancel
+                        </button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    }
+    else if (activePanel == PanelMode.Edit)
+    {
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h2 class="h5 mb-0">Edit User — @selectedUserEmail</h2>
+                <button type="button" class="btn-close" aria-label="Close form" @onclick="ClosePanels"></button>
+            </div>
+            <div class="card-body">
+                <EditForm Model="editModel" OnValidSubmit="HandleEditAsync" FormName="EditUserForm">
+                    <DataAnnotationsValidator />
+
+                    @if (!string.IsNullOrEmpty(panelError))
+                    {
+                        <div class="alert alert-danger" role="alert">@panelError</div>
+                    }
+
+                    <div class="row g-3">
+                        <div class="col-12 col-md-6">
+                            <label for="edit-fullname" class="form-label">Full Name <span class="text-danger">*</span></label>
+                            <InputText id="edit-fullname" class="form-control" @bind-Value="editModel.FullName" />
+                            <ValidationMessage For="() => editModel.FullName" />
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label for="edit-role" class="form-label">Role <span class="text-danger">*</span></label>
+                            <InputSelect id="edit-role" class="form-select" @bind-Value="editModel.Role" disabled="@(editModel.Id == currentUserId)">
+                                <option value="@AppRoles.Staff">Staff (Operations)</option>
+                                <option value="@AppRoles.Admin">Admin (Full Access)</option>
+                            </InputSelect>
+                            @if (editModel.Id == currentUserId)
+                            {
+                                <div class="form-text">You cannot change your own role.</div>
+                            }
+                            <ValidationMessage For="() => editModel.Role" />
+                        </div>
+                    </div>
+
+                    <div class="d-flex flex-wrap gap-2 mt-4">
+                        <button type="submit" class="btn btn-primary" disabled="@isSaving">
+                            @(isSaving ? "Saving..." : "Save Changes")
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" @onclick="ClosePanels" disabled="@isSaving">
+                            Cancel
+                        </button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    }
+    else if (activePanel == PanelMode.ResetPassword)
+    {
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h2 class="h5 mb-0">Reset Password — @selectedUserEmail</h2>
+                <button type="button" class="btn-close" aria-label="Close form" @onclick="ClosePanels"></button>
+            </div>
+            <div class="card-body">
+                <EditForm Model="resetModel" OnValidSubmit="HandleResetPasswordAsync" FormName="ResetPasswordForm">
+                    <DataAnnotationsValidator />
+
+                    @if (!string.IsNullOrEmpty(panelError))
+                    {
+                        <div class="alert alert-danger" role="alert">@panelError</div>
+                    }
+
+                    <div class="row g-3">
+                        <div class="col-12 col-md-6">
+                            <label for="reset-password" class="form-label">New Password <span class="text-danger">*</span></label>
+                            <InputText id="reset-password" type="password" class="form-control" @bind-Value="resetModel.NewPassword" />
+                            <ValidationMessage For="() => resetModel.NewPassword" />
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label for="reset-confirm" class="form-label">Confirm New Password <span class="text-danger">*</span></label>
+                            <InputText id="reset-confirm" type="password" class="form-control" @bind-Value="resetModel.ConfirmPassword" />
+                            <ValidationMessage For="() => resetModel.ConfirmPassword" />
+                        </div>
+                    </div>
+
+                    <div class="form-text mt-2">
+                        Resetting a password will immediately sign out any active sessions for this user.
+                    </div>
+
+                    <div class="d-flex flex-wrap gap-2 mt-4">
+                        <button type="submit" class="btn btn-primary" disabled="@isSaving">
+                            @(isSaving ? "Resetting..." : "Update Password")
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" @onclick="ClosePanels" disabled="@isSaving">
+                            Cancel
+                        </button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    }
+
+    @if (isLoading)
+    {
+        <div class="text-muted py-4">Loading users...</div>
+    }
+    else if (users.Count == 0)
+    {
+        <div class="card border-dashed text-center p-4">
+            <div class="card-body">
+                <i class="bi bi-people fs-1 text-muted"></i>
+                <h3 class="h5 mt-3">No users found</h3>
+                <p class="text-muted mb-0">Add bakery team accounts using the button above.</p>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="card shadow-sm">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Role</th>
+                            <th>Status</th>
+                            <th>Created</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var user in users)
+                        {
+                            var isSelf = user.Id == currentUserId;
+                            <tr>
+                                <td class="fw-medium">
+                                    @user.FullName
+                                    @if (isSelf)
+                                    {
+                                        <span class="badge bg-light text-dark border ms-1">You</span>
+                                    }
+                                </td>
+                                <td>@user.Email</td>
+                                <td>
+                                    @if (user.Role == AppRoles.Admin)
+                                    {
+                                        <span class="badge text-bg-dark">Admin</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge text-bg-secondary">Staff</span>
+                                    }
+                                </td>
+                                <td>
+                                    @if (!user.IsActive)
+                                    {
+                                        <span class="badge bg-danger-subtle text-danger border border-danger-subtle">Inactive</span>
+                                    }
+                                    else if (user.IsLockedOut)
+                                    {
+                                        <span class="badge bg-warning text-dark">Locked</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-success-subtle text-success border border-success-subtle">Active</span>
+                                    }
+                                </td>
+                                <td class="text-muted small">@user.CreatedAtUtc.ToString("yyyy-MM-dd")</td>
+                                <td class="text-end">
+                                    <div class="btn-group btn-group-sm" role="group" aria-label="Actions for @user.Email">
+                                        <button type="button" class="btn btn-outline-primary" @onclick="() => StartEdit(user)">
+                                            Edit
+                                        </button>
+                                        <button type="button" class="btn btn-outline-secondary" @onclick="() => StartResetPassword(user)">
+                                            Reset Password
+                                        </button>
+                                        @if (user.IsActive)
+                                        {
+                                            <button type="button"
+                                                    class="btn btn-outline-danger"
+                                                    disabled="@(isSelf || isSaving)"
+                                                    title="@(isSelf ? "You cannot deactivate your own account." : "Deactivate account")"
+                                                    @onclick="() => ToggleActiveAsync(user, false)">
+                                                Deactivate
+                                            </button>
+                                        }
+                                        else
+                                        {
+                                            <button type="button"
+                                                    class="btn btn-outline-success"
+                                                    disabled="@isSaving"
+                                                    @onclick="() => ToggleActiveAsync(user, true)">
+                                                Activate
+                                            </button>
+                                        }
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private enum PanelMode
+    {
+        None,
+        Create,
+        Edit,
+        ResetPassword
+    }
+
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthenticationStateTask { get; set; }
+
+    private List<UserSummary> users = new();
+    private CreateUserInput createModel = new();
+    private UpdateUserInput editModel = new();
+    private AdminResetPasswordInput resetModel = new();
+    private PanelMode activePanel = PanelMode.None;
+    private string selectedUserEmail = string.Empty;
+    private string currentUserId = string.Empty;
+    private bool isLoading = true;
+    private bool isSaving;
+    private string? panelError;
+    private string? statusMessage;
+    private bool statusIsError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (AuthenticationStateTask is not null)
+        {
+            var authState = await AuthenticationStateTask;
+            currentUserId = authState.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty;
+        }
+
+        await LoadUsersAsync();
+    }
+
+    private async Task LoadUsersAsync()
+    {
+        isLoading = true;
+        try
+        {
+            users = await UserManagementService.GetAllUsersAsync();
+        }
+        catch (Exception)
+        {
+            statusMessage = "Unable to load users from the database.";
+            statusIsError = true;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void StartCreate()
+    {
+        createModel = new CreateUserInput { Role = AppRoles.Staff };
+        activePanel = PanelMode.Create;
+        panelError = null;
+        ClearStatus();
+    }
+
+    private void StartEdit(UserSummary user)
+    {
+        editModel = new UpdateUserInput
+        {
+            Id = user.Id,
+            FullName = user.FullName,
+            Role = user.Role
+        };
+        selectedUserEmail = user.Email;
+        activePanel = PanelMode.Edit;
+        panelError = null;
+        ClearStatus();
+    }
+
+    private void StartResetPassword(UserSummary user)
+    {
+        resetModel = new AdminResetPasswordInput { UserId = user.Id };
+        selectedUserEmail = user.Email;
+        activePanel = PanelMode.ResetPassword;
+        panelError = null;
+        ClearStatus();
+    }
+
+    private void ClosePanels()
+    {
+        activePanel = PanelMode.None;
+        panelError = null;
+        selectedUserEmail = string.Empty;
+    }
+
+    private async Task HandleCreateAsync()
+    {
+        isSaving = true;
+        panelError = null;
+        ClearStatus();
+
+        try
+        {
+            var result = await UserManagementService.CreateUserAsync(createModel);
+            if (!result.Success)
+            {
+                panelError = result.ErrorMessage;
+                return;
+            }
+
+            statusMessage = $"Created user '{createModel.Email.Trim()}' ({createModel.Role}).";
+            statusIsError = false;
+            ClosePanels();
+            await LoadUsersAsync();
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task HandleEditAsync()
+    {
+        isSaving = true;
+        panelError = null;
+        ClearStatus();
+
+        try
+        {
+            var result = await UserManagementService.UpdateUserAsync(editModel, currentUserId);
+            if (!result.Success)
+            {
+                panelError = result.ErrorMessage;
+                return;
+            }
+
+            statusMessage = $"Updated '{editModel.FullName.Trim()}' ({editModel.Role}).";
+            statusIsError = false;
+            ClosePanels();
+            await LoadUsersAsync();
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task HandleResetPasswordAsync()
+    {
+        isSaving = true;
+        panelError = null;
+        ClearStatus();
+
+        try
+        {
+            var result = await UserManagementService.ResetPasswordAsync(resetModel.UserId, resetModel.NewPassword);
+            if (!result.Success)
+            {
+                panelError = result.ErrorMessage;
+                return;
+            }
+
+            statusMessage = $"Password updated for '{selectedUserEmail}'.";
+            statusIsError = false;
+            ClosePanels();
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task ToggleActiveAsync(UserSummary user, bool activate)
+    {
+        isSaving = true;
+        ClearStatus();
+
+        try
+        {
+            var result = await UserManagementService.SetUserActiveAsync(user.Id, activate, currentUserId);
+            if (!result.Success)
+            {
+                statusMessage = result.ErrorMessage;
+                statusIsError = true;
+                return;
+            }
+
+            statusMessage = activate
+                ? $"Activated '{user.Email}'."
+                : $"Deactivated '{user.Email}'.";
+            statusIsError = false;
+            await LoadUsersAsync();
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private void ClearStatus()
+    {
+        statusMessage = null;
+        statusIsError = false;
+    }
+}

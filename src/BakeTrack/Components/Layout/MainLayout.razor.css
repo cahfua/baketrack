@@ -16,34 +16,63 @@ main {
     background-color: #f7f7f7;
     border-bottom: 1px solid #d6d5d5;
     justify-content: flex-end;
-    height: 3.5rem;
+    min-height: 3.5rem;
+    padding-top: 0.45rem;
+    padding-bottom: 0.45rem;
     display: flex;
     align-items: center;
 }
 
-    .top-row ::deep a, .top-row ::deep .btn-link {
-        white-space: nowrap;
-        margin-left: 1.5rem;
-        text-decoration: none;
-    }
+.top-user-bar {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
 
-    .top-row ::deep a:hover, .top-row ::deep .btn-link:hover {
-        text-decoration: underline;
-    }
+.top-user-identity {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: #212529;
+    font-size: 0.925rem;
+}
 
-    .top-row ::deep a:first-child {
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
+.top-user-identity i {
+    font-size: 1.15rem;
+    color: #6c757d;
+}
 
-@media (max-width: 640.98px) {
-    .top-row {
-        justify-content: space-between;
-    }
+.top-user-name {
+    font-weight: 600;
+}
 
-    .top-row ::deep a, .top-row ::deep .btn-link {
-        margin-left: 0;
-    }
+.top-user-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-left: auto;
+}
+
+.role-badge {
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    padding: 0.3rem 0.55rem;
+}
+
+.role-badge-admin {
+    background-color: #3b342c;
+    border: 1px solid #c9a66b;
+    color: #f0ce9b;
+}
+
+.role-badge-staff {
+    background-color: #e9ecef;
+    border: 1px solid #ced4da;
+    color: #495057;
 }
 
 @media (min-width: 641px) {

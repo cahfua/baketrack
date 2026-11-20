@@ -1,0 +1,151 @@
+@page "/account"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@using System.Security.Claims
+@inject UserManagementService UserManagementService
+
+<PageTitle>My Account | BakeTrack</PageTitle>
+
+<div class="container-fluid px-0 pb-4">
+    <div class="mb-4">
+        <h1 class="mb-1">My Account</h1>
+        <p class="text-muted mb-0">Review your BakeTrack profile and update your password.</p>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-12 col-lg-5">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-white">
+                    <h2 class="h5 mb-0">Profile Information</h2>
+                </div>
+                <div class="card-body">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-4 text-muted">Full Name</dt>
+                        <dd class="col-sm-8 fw-medium">@fullName</dd>
+
+                        <dt class="col-sm-4 text-muted">Email</dt>
+                        <dd class="col-sm-8">@email</dd>
+
+                        <dt class="col-sm-4 text-muted">Role</dt>
+                        <dd class="col-sm-8 mb-0">
+                            @if (isAdmin)
+                            {
+                                <span class="badge text-bg-dark">Admin</span>
+                            }
+                            else
+                            {
+                                <span class="badge text-bg-secondary">Staff</span>
+                            }
+                        </dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-lg-7">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white">
+                    <h2 class="h5 mb-0">Change Password</h2>
+                </div>
+                <div class="card-body">
+                    @if (!string.IsNullOrEmpty(statusMessage))
+                    {
+                        <div class="alert @(statusIsError ? "alert-danger" : "alert-success")" role="alert">
+                            @statusMessage
+                        </div>
+                    }
+
+                    <EditForm Model="passwordModel" OnValidSubmit="HandleChangePasswordAsync" FormName="ChangePasswordForm">
+                        <DataAnnotationsValidator />
+
+                        <div class="mb-3">
+                            <label for="current-password" class="form-label">Current Password <span class="text-danger">*</span></label>
+                            <InputText id="current-password" type="password" class="form-control" @bind-Value="passwordModel.CurrentPassword" />
+                            <ValidationMessage For="() => passwordModel.CurrentPassword" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="new-password" class="form-label">New Password <span class="text-danger">*</span></label>
+                            <InputText id="new-password" type="password" class="form-control" @bind-Value="passwordModel.NewPassword" />
+                            <ValidationMessage For="() => passwordModel.NewPassword" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="confirm-new-password" class="form-label">Confirm New Password <span class="text-danger">*</span></label>
+                            <InputText id="confirm-new-password" type="password" class="form-control" @bind-Value="passwordModel.ConfirmPassword" />
+                            <ValidationMessage For="() => passwordModel.ConfirmPassword" />
+                        </div>
+
+                        <div class="form-text mb-3">
+                            Passwords must be at least 8 characters and include uppercase, lowercase, and a number.
+                        </div>
+
+                        <button type="submit" class="btn btn-primary" disabled="@isSaving">
+                            @(isSaving ? "Updating..." : "Update Password")
+                        </button>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthenticationStateTask { get; set; }
+
+    private ChangeOwnPasswordInput passwordModel = new();
+    private string userId = string.Empty;
+    private string fullName = "User";
+    private string email = string.Empty;
+    private bool isAdmin;
+    private bool isSaving;
+    private string? statusMessage;
+    private bool statusIsError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (AuthenticationStateTask is null)
+        {
+            return;
+        }
+
+        var authState = await AuthenticationStateTask;
+        var user = authState.User;
+
+        userId = user.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty;
+        email = user.FindFirstValue(ClaimTypes.Email) ?? user.Identity?.Name ?? string.Empty;
+        fullName = user.FindFirstValue(ApplicationUserClaimsPrincipalFactory.FullNameClaimType) ?? email;
+        isAdmin = user.IsInRole(AppRoles.Admin);
+    }
+
+    private async Task HandleChangePasswordAsync()
+    {
+        isSaving = true;
+        statusMessage = null;
+        statusIsError = false;
+
+        try
+        {
+            var result = await UserManagementService.ChangeOwnPasswordAsync(
+                userId,
+                passwordModel.CurrentPassword,
+                passwordModel.NewPassword);
+
+            if (!result.Success)
+            {
+                statusMessage = result.ErrorMessage;
+                statusIsError = true;
+                return;
+            }
+
+            passwordModel = new ChangeOwnPasswordInput();
+            statusMessage = "Your password has been updated.";
+            statusIsError = false;
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+}

@@ -41,13 +41,23 @@
     background-color: #171c20;
 }
 
+.nav-section-label {
+    padding: 1rem 1.25rem 0.35rem;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #8c9599;
+}
+
+.nav-section-divider {
+    margin: 0.75rem 1rem 0.25rem;
+    border-top: 1px solid #32383c;
+}
+
 .nav-item {
     font-size: 0.925rem;
     padding: 0.2rem 0.75rem;
-}
-
-.nav-item:first-of-type {
-    padding-top: 1.5rem;
 }
 
 .nav-item:last-of-type {
