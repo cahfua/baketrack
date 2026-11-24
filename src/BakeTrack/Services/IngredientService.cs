@@ -27,8 +27,18 @@ public class IngredientService
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<Ingredient?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+        return await db.Ingredients
+            .AsNoTracking()
+            .FirstOrDefaultAsync(i => i.Id == id, cancellationToken);
+    }
+
     public async Task<OperationResult> CreateAsync(Ingredient input, CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(input);
+
         var validationError = ValidateAndNormalize(input, out var name, out var unit);
         if (validationError is not null)
         {
@@ -40,8 +50,8 @@ public class IngredientService
         {
             Name = name,
             Unit = unit,
-            QuantityInStock = input.QuantityInStock,
-            LowStockThreshold = input.LowStockThreshold,
+            QuantityInStock = decimal.Round(input.QuantityInStock, 3, MidpointRounding.AwayFromZero),
+            LowStockThreshold = decimal.Round(input.LowStockThreshold, 3, MidpointRounding.AwayFromZero),
             ExpiryDate = input.ExpiryDate
         };
 
@@ -53,6 +63,8 @@ public class IngredientService
 
     public async Task<OperationResult> UpdateAsync(Ingredient input, CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(input);
+
         var validationError = ValidateAndNormalize(input, out var name, out var unit);
         if (validationError is not null)
         {
@@ -68,8 +80,8 @@ public class IngredientService
 
         existing.Name = name;
         existing.Unit = unit;
-        existing.QuantityInStock = input.QuantityInStock;
-        existing.LowStockThreshold = input.LowStockThreshold;
+        existing.QuantityInStock = decimal.Round(input.QuantityInStock, 3, MidpointRounding.AwayFromZero);
+        existing.LowStockThreshold = decimal.Round(input.LowStockThreshold, 3, MidpointRounding.AwayFromZero);
         existing.ExpiryDate = input.ExpiryDate;
 
         await db.SaveChangesAsync(cancellationToken);
@@ -83,6 +95,24 @@ public class IngredientService
         if (existing is null)
         {
             return new OperationResult(false, "The ingredient was already deleted.");
+        }
+
+        var usedInRecipes = await db.RecipeIngredients
+            .AnyAsync(r => r.IngredientId == id, cancellationToken);
+        if (usedInRecipes)
+        {
+            return new OperationResult(
+                false,
+                "Cannot delete this ingredient because it is used in one or more product recipes.");
+        }
+
+        var hasTransactions = await db.InventoryTransactions
+            .AnyAsync(t => t.IngredientId == id, cancellationToken);
+        if (hasTransactions)
+        {
+            return new OperationResult(
+                false,
+                "Cannot delete this ingredient because it is linked to existing inventory transactions.");
         }
 
         try
@@ -109,9 +139,19 @@ public class IngredientService
             return "Ingredient name is required and cannot contain only spaces.";
         }
 
+        if (name.Length > 100)
+        {
+            return "Ingredient name cannot exceed 100 characters.";
+        }
+
         if (string.IsNullOrWhiteSpace(unit))
         {
             return "Unit of measurement is required.";
+        }
+
+        if (unit.Length > 30)
+        {
+            return "Unit cannot exceed 30 characters.";
         }
 
         if (input.QuantityInStock < 0)

@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 
 namespace BakeTrack.Models;
 
@@ -11,5 +12,6 @@ public class RecipeIngredient
     public int IngredientId { get; set; }
     public Ingredient Ingredient { get; set; } = null!;
 
+    [Range(typeof(decimal), "0.001", "999999999999.999", ErrorMessage = "Quantity required must be greater than 0.")]
     public decimal QuantityRequired { get; set; }
 }

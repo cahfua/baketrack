@@ -96,6 +96,7 @@ builder.Services.ConfigureApplicationCookie(options =>
 
 builder.Services.AddScoped<DashboardService>();
 builder.Services.AddScoped<IngredientService>();
+builder.Services.AddScoped<ProductService>();
 builder.Services.AddScoped<UserManagementService>();
 
 var app = builder.Build();
