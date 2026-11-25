@@ -11,7 +11,10 @@
     <div class="dashboard-header d-flex flex-wrap justify-content-between align-items-start gap-2">
         <div>
             <h1>Dashboard</h1>
-            <p class="mb-0">Welcome back, <strong>@displayName</strong>. Here's an overview of your bakery.</p>
+            <p class="mb-0">
+                Welcome back, <strong>@displayName</strong>.
+                Here's an overview of your bakery.
+            </p>
         </div>
         <span class="badge @(isAdmin ? "text-bg-dark" : "text-bg-secondary") align-self-center">
             @(isAdmin ? "Admin Access" : "Staff Access")
@@ -73,6 +76,149 @@
 
     </div>
 
+    <section class="dashboard-section mt-5"
+             aria-labelledby="ingredient-alerts-heading">
+        <h2 id="ingredient-alerts-heading">Ingredient Alerts</h2>
+        <p>
+            Current inventory information.
+            Reload the dashboard after making changes to update these lists.
+        </p>
+
+        @if (isLoading)
+        {
+            <p role="status">Loading ingredient alerts...</p>
+        }
+        else if (alerts is null)
+        {
+            <p>Ingredient alerts are unavailable right now.</p>
+        }
+        else
+        {
+            <div class="row g-4">
+                <div class="col-lg-6">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <h3 class="h5">
+                                Low Stock
+                                <span class="badge text-bg-warning">
+                                    @alerts.LowStock.Count
+                                </span>
+                            </h3>
+                            <p class="text-muted small">
+                                Ingredients at or below their minimum stock level.
+                            </p>
+
+                            @if (alerts.LowStock.Count == 0)
+                            {
+                                <p class="mb-0">
+                                    No ingredients are currently low on stock.
+                                </p>
+                            }
+                            else
+                            {
+                                <div class="table-responsive">
+                                    <table class="table table-sm align-middle">
+                                        <caption class="visually-hidden">
+                                            Ingredients at or below minimum stock
+                                        </caption>
+                                        <thead>
+                                            <tr>
+                                                <th scope="col">Ingredient</th>
+                                                <th scope="col">Available</th>
+                                                <th scope="col">Minimum</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach (var item in alerts.LowStock)
+                                            {
+                                                <tr>
+                                                    <td>@item.Name</td>
+                                                    <td>
+                                                        @item.QuantityInStock.ToString("0.###")
+                                                        @item.Unit
+                                                    </td>
+                                                    <td>
+                                                        @item.LowStockThreshold.ToString("0.###")
+                                                        @item.Unit
+                                                    </td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            }
+
+                            <a href="/ingredients" class="d-inline-block mt-3">
+                                Manage ingredients →
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-6">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <h3 class="h5">
+                                Expiring Soon
+                                <span class="badge text-bg-warning">
+                                    @alerts.ExpiringSoon.Count
+                                </span>
+                            </h3>
+                            <p class="text-muted small">
+                                Expiry dates from today through the next
+                                @DashboardService.ExpiringSoonDays days, using UTC dates.
+                                Already expired ingredients are excluded.
+                            </p>
+
+                            @if (alerts.ExpiringSoon.Count == 0)
+                            {
+                                <p class="mb-0">
+                                    No ingredients are expiring within this window.
+                                </p>
+                            }
+                            else
+                            {
+                                <div class="table-responsive">
+                                    <table class="table table-sm align-middle">
+                                        <caption class="visually-hidden">
+                                            Ingredients expiring soon
+                                        </caption>
+                                        <thead>
+                                            <tr>
+                                                <th scope="col">Ingredient</th>
+                                                <th scope="col">Available</th>
+                                                <th scope="col">Expiry date</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach (var item in alerts.ExpiringSoon)
+                                            {
+                                                <tr>
+                                                    <td>@item.Name</td>
+                                                    <td>
+                                                        @item.QuantityInStock.ToString("0.###")
+                                                        @item.Unit
+                                                    </td>
+                                                    <td>
+                                                        @(item.ExpiryDate?.ToString("dd MMM yyyy"))
+                                                    </td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            }
+
+                            <a href="/ingredients" class="d-inline-block mt-3">
+                                Review ingredients →
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </section>
+
     <div class="dashboard-section mt-5">
         <h2>Getting Started</h2>
         <p>Use the navigation menu to manage your bakery operations.</p>
@@ -114,8 +260,10 @@
     private Task<AuthenticationState>? AuthenticationStateTask { get; set; }
 
     private DashboardSummary summary = new(0, 0, 0, 0);
+    private DashboardAlerts? alerts;
     private string displayName = "Baker";
     private bool isAdmin;
+    private bool isLoading = true;
     private string? loadError;
 
     protected override async Task OnInitializedAsync()
@@ -124,19 +272,29 @@
         {
             var authState = await AuthenticationStateTask;
             var user = authState.User;
-            displayName = user.FindFirstValue(ApplicationUserClaimsPrincipalFactory.FullNameClaimType)
-                          ?? user.Identity?.Name
-                          ?? "Baker";
+
+            displayName =
+                user.FindFirstValue(
+                    ApplicationUserClaimsPrincipalFactory.FullNameClaimType)
+                ?? user.Identity?.Name
+                ?? "Baker";
+
             isAdmin = user.IsInRole(AppRoles.Admin);
         }
 
         try
         {
             summary = await DashboardService.GetSummaryAsync();
+            alerts = await DashboardService.GetAlertsAsync();
         }
         catch (Exception)
         {
-            loadError = "Unable to load bakery metrics from the database right now.";
+            loadError =
+                "Unable to load all dashboard information from the database right now.";
+        }
+        finally
+        {
+            isLoading = false;
         }
     }
 }
