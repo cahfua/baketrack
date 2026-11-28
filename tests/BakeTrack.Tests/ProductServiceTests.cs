@@ -190,6 +190,53 @@ public sealed class ProductServiceTests
         Assert.Empty(await service.GetAllAsync());
     }
 
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-0.001)]
+    [InlineData(0.0001)]
+    [InlineData(0.0009)]
+    public async Task CreateAsync_RecipeQuantityBelowMinimum_ReturnsValidationErrorAndDoesNotPersist(decimal invalidQuantity)
+    {
+        await using var factory = await SqliteBakeryDbFactory.CreateAsync();
+        var flourId = await SeedIngredientAsync(factory, "Flour");
+        var service = new ProductService(factory);
+
+        var result = await service.CreateAsync(new ProductInput
+        {
+            Name = "Brioche",
+            Category = "Bread",
+            BatchYield = 10,
+            Price = 4.50m,
+            RecipeIngredients = [new RecipeIngredientInput { IngredientId = flourId, QuantityRequired = invalidQuantity }]
+        });
+
+        Assert.False(result.Success);
+        Assert.Contains("0.001", result.ErrorMessage, StringComparison.Ordinal);
+        Assert.Empty(await service.GetAllAsync());
+    }
+
+    [Fact]
+    public async Task CreateAsync_RecipeQuantityAtMinimum_PersistsExpectedValue()
+    {
+        await using var factory = await SqliteBakeryDbFactory.CreateAsync();
+        var vanillaId = await SeedIngredientAsync(factory, "Vanilla Extract", "L");
+        var service = new ProductService(factory);
+
+        var result = await service.CreateAsync(new ProductInput
+        {
+            Name = "Vanilla Cupcake",
+            Category = "Cake",
+            BatchYield = 12,
+            Price = 3.00m,
+            RecipeIngredients = [new RecipeIngredientInput { IngredientId = vanillaId, QuantityRequired = 0.001m }]
+        });
+
+        Assert.True(result.Success);
+        var detail = await service.GetByIdAsync(result.Value);
+        Assert.NotNull(detail);
+        Assert.Equal(0.001m, Assert.Single(detail.RecipeIngredients).QuantityRequired);
+    }
+
     [Fact]
     public async Task UpdateAsync_ValidChanges_UpdatesMetadataWithoutWipingRecipe()
     {
@@ -314,6 +361,175 @@ public sealed class ProductServiceTests
 
         await using var db = await factory.CreateDbContextAsync();
         Assert.True(await db.Ingredients.AnyAsync(i => i.Id == flourId));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-0.001)]
+    [InlineData(0.0001)]
+    [InlineData(0.0009)]
+    public async Task AddRecipeIngredientAsync_QuantityBelowMinimum_RejectsAndDoesNotPersist(decimal invalidQuantity)
+    {
+        await using var factory = await SqliteBakeryDbFactory.CreateAsync();
+        var flourId = await SeedIngredientAsync(factory, "Flour", "kg");
+        var service = new ProductService(factory);
+
+        var created = await service.CreateAsync(new ProductInput
+        {
+            Name = "Baguette",
+            Category = "Bread",
+            BatchYield = 10,
+            Price = 3.25m
+        });
+        Assert.True(created.Success);
+
+        var addResult = await service.AddRecipeIngredientAsync(
+            created.Value,
+            new RecipeIngredientInput { IngredientId = flourId, QuantityRequired = invalidQuantity });
+
+        Assert.False(addResult.Success);
+        Assert.Contains("0.001", addResult.ErrorMessage, StringComparison.Ordinal);
+
+        var detail = await service.GetByIdAsync(created.Value);
+        Assert.NotNull(detail);
+        Assert.Empty(detail.RecipeIngredients);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-0.001)]
+    [InlineData(0.0001)]
+    [InlineData(0.0009)]
+    public async Task UpdateRecipeIngredientQuantityAsync_QuantityBelowMinimum_RejectsAndPreservesSavedQuantity(
+        decimal invalidQuantity)
+    {
+        await using var factory = await SqliteBakeryDbFactory.CreateAsync();
+        var flourId = await SeedIngredientAsync(factory, "Flour", "kg");
+        var service = new ProductService(factory);
+
+        var created = await service.CreateAsync(new ProductInput
+        {
+            Name = "Baguette",
+            Category = "Bread",
+            BatchYield = 10,
+            Price = 3.25m,
+            RecipeIngredients = [new RecipeIngredientInput { IngredientId = flourId, QuantityRequired = 1.25m }]
+        });
+        Assert.True(created.Success);
+
+        var updateResult = await service.UpdateRecipeIngredientQuantityAsync(
+            created.Value,
+            flourId,
+            invalidQuantity);
+
+        Assert.False(updateResult.Success);
+        Assert.Contains("0.001", updateResult.ErrorMessage, StringComparison.Ordinal);
+
+        var detail = await service.GetByIdAsync(created.Value);
+        Assert.NotNull(detail);
+        Assert.Equal(1.25m, Assert.Single(detail.RecipeIngredients).QuantityRequired);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-0.001)]
+    [InlineData(0.0001)]
+    [InlineData(0.0009)]
+    public async Task SaveRecipeAsync_QuantityBelowMinimum_RejectsAndPreservesSavedRecipe(decimal invalidQuantity)
+    {
+        await using var factory = await SqliteBakeryDbFactory.CreateAsync();
+        var flourId = await SeedIngredientAsync(factory, "Flour", "kg");
+        var butterId = await SeedIngredientAsync(factory, "Butter", "kg");
+        var sugarId = await SeedIngredientAsync(factory, "Sugar", "kg");
+        var service = new ProductService(factory);
+
+        var created = await service.CreateAsync(new ProductInput
+        {
+            Name = "Butter Cookie",
+            Category = "Cookies",
+            BatchYield = 24,
+            Price = 1.50m,
+            RecipeIngredients =
+            [
+                new RecipeIngredientInput { IngredientId = flourId, QuantityRequired = 1.0m },
+                new RecipeIngredientInput { IngredientId = butterId, QuantityRequired = 0.5m }
+            ]
+        });
+        Assert.True(created.Success);
+
+        var saveResult = await service.SaveRecipeAsync(
+            created.Value,
+            [
+                new RecipeIngredientInput { IngredientId = flourId, QuantityRequired = invalidQuantity },
+                new RecipeIngredientInput { IngredientId = sugarId, QuantityRequired = 0.4m }
+            ]);
+
+        Assert.False(saveResult.Success);
+        Assert.Contains("0.001", saveResult.ErrorMessage, StringComparison.Ordinal);
+
+        var detail = await service.GetByIdAsync(created.Value);
+        Assert.NotNull(detail);
+        Assert.Collection(
+            detail.RecipeIngredients,
+            first =>
+            {
+                Assert.Equal(butterId, first.IngredientId);
+                Assert.Equal(0.5m, first.QuantityRequired);
+            },
+            second =>
+            {
+                Assert.Equal(flourId, second.IngredientId);
+                Assert.Equal(1.0m, second.QuantityRequired);
+            });
+    }
+
+    [Fact]
+    public async Task RecipeUpdateOperations_QuantityAtMinimum_PersistExpectedValue()
+    {
+        await using var factory = await SqliteBakeryDbFactory.CreateAsync();
+        var saltId = await SeedIngredientAsync(factory, "Sea Salt", "kg");
+        var yeastId = await SeedIngredientAsync(factory, "Yeast", "kg");
+        var service = new ProductService(factory);
+
+        var created = await service.CreateAsync(new ProductInput
+        {
+            Name = "Country Loaf",
+            Category = "Bread",
+            BatchYield = 4,
+            Price = 6.00m
+        });
+        Assert.True(created.Success);
+
+        var addResult = await service.AddRecipeIngredientAsync(
+            created.Value,
+            new RecipeIngredientInput { IngredientId = saltId, QuantityRequired = 0.001m });
+        Assert.True(addResult.Success);
+
+        var updateResult = await service.UpdateRecipeIngredientQuantityAsync(created.Value, saltId, 0.002m);
+        Assert.True(updateResult.Success);
+
+        var saveResult = await service.SaveRecipeAsync(
+            created.Value,
+            [
+                new RecipeIngredientInput { IngredientId = saltId, QuantityRequired = 0.001m },
+                new RecipeIngredientInput { IngredientId = yeastId, QuantityRequired = 0.001m }
+            ]);
+        Assert.True(saveResult.Success);
+
+        var detail = await service.GetByIdAsync(created.Value);
+        Assert.NotNull(detail);
+        Assert.Collection(
+            detail.RecipeIngredients,
+            first =>
+            {
+                Assert.Equal(saltId, first.IngredientId);
+                Assert.Equal(0.001m, first.QuantityRequired);
+            },
+            second =>
+            {
+                Assert.Equal(yeastId, second.IngredientId);
+                Assert.Equal(0.001m, second.QuantityRequired);
+            });
     }
 
     [Fact]

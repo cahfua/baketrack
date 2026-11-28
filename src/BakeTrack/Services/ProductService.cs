@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Globalization;
 using BakeTrack.Data;
 using BakeTrack.Models;
 using Microsoft.EntityFrameworkCore;
@@ -37,7 +38,7 @@ public sealed class RecipeIngredientInput
     [Range(1, int.MaxValue, ErrorMessage = "Please select an ingredient.")]
     public int IngredientId { get; set; }
 
-    [Range(typeof(decimal), "0.001", "999999999999.999", ErrorMessage = "Quantity required must be greater than 0.")]
+    [Range(typeof(decimal), "0.001", "999999999999.999", ErrorMessage = "Quantity required must be at least 0.001.")]
     public decimal QuantityRequired { get; set; }
 }
 
@@ -74,6 +75,7 @@ public class ProductService
     private const int MaxCategoryLength = 60;
     private const int MaxDescriptionLength = 500;
     private const decimal MaxPrice = 999999999999.99m;
+    private const decimal MinRecipeQuantity = 0.001m;
     private const decimal MaxRecipeQuantity = 999999999999.999m;
 
     private readonly IDbContextFactory<BakeryDbContext> _dbFactory;
@@ -183,7 +185,7 @@ public class ProductService
             RecipeIngredients = recipeItems.Select(item => new RecipeIngredient
             {
                 IngredientId = item.IngredientId,
-                QuantityRequired = decimal.Round(item.QuantityRequired, 3, MidpointRounding.AwayFromZero)
+                QuantityRequired = RoundRecipeQuantity(item.QuantityRequired)
             }).ToList()
         };
 
@@ -260,7 +262,7 @@ public class ProductService
 
         var desiredByIngredient = items.ToDictionary(
             i => i.IngredientId,
-            i => decimal.Round(i.QuantityRequired, 3, MidpointRounding.AwayFromZero));
+            i => RoundRecipeQuantity(i.QuantityRequired));
 
         var toRemove = product.RecipeIngredients
             .Where(existing => !desiredByIngredient.ContainsKey(existing.IngredientId))
@@ -334,7 +336,7 @@ public class ProductService
         {
             ProductId = productId,
             IngredientId = item.IngredientId,
-            QuantityRequired = decimal.Round(item.QuantityRequired, 3, MidpointRounding.AwayFromZero)
+            QuantityRequired = RoundRecipeQuantity(item.QuantityRequired)
         });
 
         await db.SaveChangesAsync(cancellationToken);
@@ -362,7 +364,7 @@ public class ProductService
             return new OperationResult(false, "The selected recipe ingredient no longer exists.");
         }
 
-        existing.QuantityRequired = decimal.Round(quantityRequired, 3, MidpointRounding.AwayFromZero);
+        existing.QuantityRequired = RoundRecipeQuantity(quantityRequired);
         await db.SaveChangesAsync(cancellationToken);
 
         return new OperationResult(true);
@@ -500,16 +502,23 @@ public class ProductService
         return ValidateRecipeQuantity(item.QuantityRequired);
     }
 
+    private static decimal RoundRecipeQuantity(decimal quantityRequired) =>
+        decimal.Round(quantityRequired, 3, MidpointRounding.AwayFromZero);
+
     private static string? ValidateRecipeQuantity(decimal quantityRequired)
     {
-        if (quantityRequired <= 0)
+        if (quantityRequired < MinRecipeQuantity)
         {
-            return "Recipe ingredient quantity must be greater than 0.";
+            return string.Create(
+                CultureInfo.InvariantCulture,
+                $"Recipe ingredient quantity must be at least {MinRecipeQuantity:0.###}.");
         }
 
         if (quantityRequired > MaxRecipeQuantity)
         {
-            return $"Recipe ingredient quantity cannot exceed {MaxRecipeQuantity:0.###}.";
+            return string.Create(
+                CultureInfo.InvariantCulture,
+                $"Recipe ingredient quantity cannot exceed {MaxRecipeQuantity:0.###}.");
         }
 
         return null;
