@@ -21,17 +21,7 @@ public static class DatabaseConfiguration
                     "Or start the optional local Docker database with: docker compose up -d");
             }
 
-            var normalized = NormalizeConnectionString(localConnection, isProduction: false);
-            var builder = new NpgsqlConnectionStringBuilder(normalized);
-
-            if (IsRenderHost(builder.Host))
-            {
-                throw new InvalidOperationException(
-                    $"Blocked attempt to connect Development environment to a Render PostgreSQL host ('{builder.Host}'). " +
-                    "Update your local User Secrets to point to your local PostgreSQL instance.");
-            }
-
-            return builder.ConnectionString;
+            return EnsureLocalConnectionString(localConnection, "Development environment");
         }
 
         // Production / non-Development: prefer Render's DATABASE_URL, then ConnectionStrings:DefaultConnection.
@@ -48,6 +38,21 @@ public static class DatabaseConfiguration
         }
 
         return NormalizeConnectionString(rawProdConnection, isProduction: true);
+    }
+
+    public static string EnsureLocalConnectionString(string rawValue, string contextLabel = "Development environment")
+    {
+        var normalized = NormalizeConnectionString(rawValue, isProduction: false);
+        var builder = new NpgsqlConnectionStringBuilder(normalized);
+
+        if (IsRenderHost(builder.Host))
+        {
+            throw new InvalidOperationException(
+                $"Blocked attempt to connect {contextLabel} to a Render PostgreSQL host ('{builder.Host}'). " +
+                "Update your local configuration to point to your local PostgreSQL instance.");
+        }
+
+        return builder.ConnectionString;
     }
 
     public static string NormalizeConnectionString(string rawValue, bool isProduction)

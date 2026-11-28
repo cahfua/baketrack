@@ -5,38 +5,50 @@ using Microsoft.EntityFrameworkCore;
 
 namespace BakeTrack.Tests;
 
+[Collection(PostgresDatabaseCollection.Name)]
 public sealed class ProductServiceTests
 {
-    private static async Task<int> SeedIngredientAsync(
-        SqliteBakeryDbFactory factory,
-        string name,
+    private readonly PostgresDatabaseFixture _fixture;
+
+    public ProductServiceTests(PostgresDatabaseFixture fixture)
+    {
+        _fixture = fixture;
+    }
+
+    private static string UniqueName(string prefix)
+        => $"{prefix} {Guid.NewGuid():N}";
+
+    private static async Task<(int Id, string Name)> SeedIngredientAsync(
+        PostgresBakeryDbFactory factory,
+        string namePrefix,
         string unit = "kg",
         decimal stock = 25m)
     {
         await using var db = await factory.CreateDbContextAsync();
         var ingredient = new Ingredient
         {
-            Name = name,
+            Name = UniqueName(namePrefix),
             Unit = unit,
             QuantityInStock = stock,
             LowStockThreshold = 2m
         };
         db.Ingredients.Add(ingredient);
         await db.SaveChangesAsync();
-        return ingredient.Id;
+        return (ingredient.Id, ingredient.Name);
     }
 
     [Fact]
     public async Task CreateAsync_ValidProductWithRecipe_PersistsAcrossContexts()
     {
-        await using var factory = await SqliteBakeryDbFactory.CreateAsync();
-        var flourId = await SeedIngredientAsync(factory, "Bread Flour", "kg");
-        var waterId = await SeedIngredientAsync(factory, "Water", "L");
+        await using var factory = await PostgresBakeryDbFactory.CreateAsync(_fixture.ConnectionString);
+        var (flourId, flourName) = await SeedIngredientAsync(factory, "Bread Flour", "kg");
+        var (waterId, waterName) = await SeedIngredientAsync(factory, "Water", "L");
         var service = new ProductService(factory);
+        var productName = UniqueName("Sourdough Boule");
 
         var result = await service.CreateAsync(new ProductInput
         {
-            Name = "  Sourdough Boule  ",
+            Name = $"  {productName}  ",
             Category = "  Bread ",
             BatchYield = 8,
             Price = 6.755m,
@@ -51,9 +63,8 @@ public sealed class ProductServiceTests
         Assert.True(result.Success);
         Assert.True(result.Value > 0);
 
-        var list = await service.GetAllAsync();
-        var summary = Assert.Single(list);
-        Assert.Equal("Sourdough Boule", summary.Name);
+        var summary = Assert.Single(await service.GetAllAsync(), p => p.Id == result.Value);
+        Assert.Equal(productName, summary.Name);
         Assert.Equal("Bread", summary.Category);
         Assert.Equal(8, summary.BatchYield);
         Assert.Equal(6.76m, summary.Price);
@@ -63,22 +74,22 @@ public sealed class ProductServiceTests
         var detail = await service.GetByIdAsync(result.Value);
         Assert.NotNull(detail);
         Assert.Equal(2, detail.RecipeIngredients.Count);
-        Assert.Equal("Bread Flour", detail.RecipeIngredients[0].IngredientName);
+        Assert.Equal(flourName, detail.RecipeIngredients[0].IngredientName);
         Assert.Equal("kg", detail.RecipeIngredients[0].Unit);
         Assert.Equal(2.5m, detail.RecipeIngredients[0].QuantityRequired);
-        Assert.Equal("Water", detail.RecipeIngredients[1].IngredientName);
+        Assert.Equal(waterName, detail.RecipeIngredients[1].IngredientName);
         Assert.Equal("L", detail.RecipeIngredients[1].Unit);
     }
 
     [Fact]
     public async Task CreateAsync_ZeroPrice_Succeeds()
     {
-        await using var factory = await SqliteBakeryDbFactory.CreateAsync();
+        await using var factory = await PostgresBakeryDbFactory.CreateAsync(_fixture.ConnectionString);
         var service = new ProductService(factory);
 
         var result = await service.CreateAsync(new ProductInput
         {
-            Name = "Baker Sample Roll",
+            Name = UniqueName("Baker Sample Roll"),
             Category = "Bread",
             BatchYield = 12,
             Price = 0m
@@ -90,12 +101,13 @@ public sealed class ProductServiceTests
     [Fact]
     public async Task CreateAsync_DuplicateProductNameCaseInsensitive_ReturnsError()
     {
-        await using var factory = await SqliteBakeryDbFactory.CreateAsync();
+        await using var factory = await PostgresBakeryDbFactory.CreateAsync(_fixture.ConnectionString);
         var service = new ProductService(factory);
+        var productName = UniqueName("Croissant");
 
         var first = await service.CreateAsync(new ProductInput
         {
-            Name = "Croissant",
+            Name = productName,
             Category = "Pastry",
             BatchYield = 24,
             Price = 3.50m
@@ -104,7 +116,7 @@ public sealed class ProductServiceTests
 
         var duplicate = await service.CreateAsync(new ProductInput
         {
-            Name = "  croissant ",
+            Name = $"  {productName.ToLowerInvariant()} ",
             Category = "Pastry",
             BatchYield = 12,
             Price = 4.00m
@@ -112,7 +124,7 @@ public sealed class ProductServiceTests
 
         Assert.False(duplicate.Success);
         Assert.Contains("already exists", duplicate.ErrorMessage, StringComparison.OrdinalIgnoreCase);
-        Assert.Single(await service.GetAllAsync());
+        Assert.Single(await service.GetAllAsync(), p => p.Name == productName);
     }
 
     [Theory]
@@ -130,12 +142,14 @@ public sealed class ProductServiceTests
         int batchYield,
         decimal price)
     {
-        await using var factory = await SqliteBakeryDbFactory.CreateAsync();
+        await using var factory = await PostgresBakeryDbFactory.CreateAsync(_fixture.ConnectionString);
         var service = new ProductService(factory);
+        var initialCount = (await service.GetAllAsync()).Count;
+        var candidateName = string.IsNullOrWhiteSpace(name) ? name : UniqueName(name);
 
         var result = await service.CreateAsync(new ProductInput
         {
-            Name = name,
+            Name = candidateName,
             Category = category,
             BatchYield = batchYield,
             Price = price
@@ -143,19 +157,20 @@ public sealed class ProductServiceTests
 
         Assert.False(result.Success);
         Assert.False(string.IsNullOrWhiteSpace(result.ErrorMessage));
-        Assert.Empty(await service.GetAllAsync());
+        Assert.Equal(initialCount, (await service.GetAllAsync()).Count);
     }
 
     [Fact]
     public async Task CreateAsync_InvalidRecipeItems_ReturnsValidationError()
     {
-        await using var factory = await SqliteBakeryDbFactory.CreateAsync();
-        var flourId = await SeedIngredientAsync(factory, "Flour");
+        await using var factory = await PostgresBakeryDbFactory.CreateAsync(_fixture.ConnectionString);
+        var (flourId, _) = await SeedIngredientAsync(factory, "Flour");
         var service = new ProductService(factory);
+        var initialCount = (await service.GetAllAsync()).Count;
 
         var zeroQty = await service.CreateAsync(new ProductInput
         {
-            Name = "Brioche",
+            Name = UniqueName("Brioche"),
             Category = "Bread",
             BatchYield = 10,
             Price = 4.50m,
@@ -164,7 +179,7 @@ public sealed class ProductServiceTests
 
         var duplicateIngredient = await service.CreateAsync(new ProductInput
         {
-            Name = "Brioche",
+            Name = UniqueName("Brioche"),
             Category = "Bread",
             BatchYield = 10,
             Price = 4.50m,
@@ -177,17 +192,17 @@ public sealed class ProductServiceTests
 
         var missingIngredient = await service.CreateAsync(new ProductInput
         {
-            Name = "Brioche",
+            Name = UniqueName("Brioche"),
             Category = "Bread",
             BatchYield = 10,
             Price = 4.50m,
-            RecipeIngredients = [new RecipeIngredientInput { IngredientId = 9999, QuantityRequired = 1m }]
+            RecipeIngredients = [new RecipeIngredientInput { IngredientId = -9999, QuantityRequired = 1m }]
         });
 
         Assert.False(zeroQty.Success);
         Assert.False(duplicateIngredient.Success);
         Assert.False(missingIngredient.Success);
-        Assert.Empty(await service.GetAllAsync());
+        Assert.Equal(initialCount, (await service.GetAllAsync()).Count);
     }
 
     [Theory]
@@ -197,13 +212,14 @@ public sealed class ProductServiceTests
     [InlineData(0.0009)]
     public async Task CreateAsync_RecipeQuantityBelowMinimum_ReturnsValidationErrorAndDoesNotPersist(decimal invalidQuantity)
     {
-        await using var factory = await SqliteBakeryDbFactory.CreateAsync();
-        var flourId = await SeedIngredientAsync(factory, "Flour");
+        await using var factory = await PostgresBakeryDbFactory.CreateAsync(_fixture.ConnectionString);
+        var (flourId, _) = await SeedIngredientAsync(factory, "Flour");
         var service = new ProductService(factory);
+        var initialCount = (await service.GetAllAsync()).Count;
 
         var result = await service.CreateAsync(new ProductInput
         {
-            Name = "Brioche",
+            Name = UniqueName("Brioche"),
             Category = "Bread",
             BatchYield = 10,
             Price = 4.50m,
@@ -212,19 +228,19 @@ public sealed class ProductServiceTests
 
         Assert.False(result.Success);
         Assert.Contains("0.001", result.ErrorMessage, StringComparison.Ordinal);
-        Assert.Empty(await service.GetAllAsync());
+        Assert.Equal(initialCount, (await service.GetAllAsync()).Count);
     }
 
     [Fact]
     public async Task CreateAsync_RecipeQuantityAtMinimum_PersistsExpectedValue()
     {
-        await using var factory = await SqliteBakeryDbFactory.CreateAsync();
-        var vanillaId = await SeedIngredientAsync(factory, "Vanilla Extract", "L");
+        await using var factory = await PostgresBakeryDbFactory.CreateAsync(_fixture.ConnectionString);
+        var (vanillaId, _) = await SeedIngredientAsync(factory, "Vanilla Extract", "L");
         var service = new ProductService(factory);
 
         var result = await service.CreateAsync(new ProductInput
         {
-            Name = "Vanilla Cupcake",
+            Name = UniqueName("Vanilla Cupcake"),
             Category = "Cake",
             BatchYield = 12,
             Price = 3.00m,
@@ -240,23 +256,25 @@ public sealed class ProductServiceTests
     [Fact]
     public async Task UpdateAsync_ValidChanges_UpdatesMetadataWithoutWipingRecipe()
     {
-        await using var factory = await SqliteBakeryDbFactory.CreateAsync();
-        var flourId = await SeedIngredientAsync(factory, "Flour");
+        await using var factory = await PostgresBakeryDbFactory.CreateAsync(_fixture.ConnectionString);
+        var (flourId, _) = await SeedIngredientAsync(factory, "Flour");
         var service = new ProductService(factory);
+        var updatedName = UniqueName("Rosemary Focaccia");
 
         var created = await service.CreateAsync(new ProductInput
         {
-            Name = "Focaccia",
+            Name = UniqueName("Focaccia"),
             Category = "Bread",
             BatchYield = 6,
             Price = 7.00m,
             RecipeIngredients = [new RecipeIngredientInput { IngredientId = flourId, QuantityRequired = 1.8m }]
         });
+        Assert.True(created.Success);
 
         var updateResult = await service.UpdateAsync(new ProductInput
         {
             Id = created.Value,
-            Name = "Rosemary Focaccia",
+            Name = updatedName,
             Category = "Artisan Bread",
             BatchYield = 8,
             Price = 8.50m,
@@ -266,7 +284,7 @@ public sealed class ProductServiceTests
         Assert.True(updateResult.Success);
         var detail = await service.GetByIdAsync(created.Value);
         Assert.NotNull(detail);
-        Assert.Equal("Rosemary Focaccia", detail.Name);
+        Assert.Equal(updatedName, detail.Name);
         Assert.Equal("Artisan Bread", detail.Category);
         Assert.Equal(8, detail.BatchYield);
         Assert.Equal(8.50m, detail.Price);
@@ -276,15 +294,15 @@ public sealed class ProductServiceTests
     [Fact]
     public async Task SaveRecipeAsync_SyncsAddsUpdatesAndRemovals()
     {
-        await using var factory = await SqliteBakeryDbFactory.CreateAsync();
-        var flourId = await SeedIngredientAsync(factory, "Flour", "kg");
-        var butterId = await SeedIngredientAsync(factory, "Butter", "kg");
-        var sugarId = await SeedIngredientAsync(factory, "Sugar", "kg");
+        await using var factory = await PostgresBakeryDbFactory.CreateAsync(_fixture.ConnectionString);
+        var (flourId, _) = await SeedIngredientAsync(factory, "Flour", "kg");
+        var (butterId, _) = await SeedIngredientAsync(factory, "Butter", "kg");
+        var (sugarId, _) = await SeedIngredientAsync(factory, "Sugar", "kg");
         var service = new ProductService(factory);
 
         var created = await service.CreateAsync(new ProductInput
         {
-            Name = "Butter Cookie",
+            Name = UniqueName("Butter Cookie"),
             Category = "Cookies",
             BatchYield = 24,
             Price = 1.50m,
@@ -294,6 +312,7 @@ public sealed class ProductServiceTests
                 new RecipeIngredientInput { IngredientId = butterId, QuantityRequired = 0.5m }
             ]
         });
+        Assert.True(created.Success);
 
         var saveResult = await service.SaveRecipeAsync(
             created.Value,
@@ -324,17 +343,18 @@ public sealed class ProductServiceTests
     [Fact]
     public async Task SingleItemRecipeOperations_AddUpdateRemove_EnforceRules()
     {
-        await using var factory = await SqliteBakeryDbFactory.CreateAsync();
-        var flourId = await SeedIngredientAsync(factory, "Flour", "kg");
+        await using var factory = await PostgresBakeryDbFactory.CreateAsync(_fixture.ConnectionString);
+        var (flourId, _) = await SeedIngredientAsync(factory, "Flour", "kg");
         var service = new ProductService(factory);
 
         var created = await service.CreateAsync(new ProductInput
         {
-            Name = "Baguette",
+            Name = UniqueName("Baguette"),
             Category = "Bread",
             BatchYield = 10,
             Price = 3.25m
         });
+        Assert.True(created.Success);
 
         var addOk = await service.AddRecipeIngredientAsync(
             created.Value,
@@ -370,13 +390,13 @@ public sealed class ProductServiceTests
     [InlineData(0.0009)]
     public async Task AddRecipeIngredientAsync_QuantityBelowMinimum_RejectsAndDoesNotPersist(decimal invalidQuantity)
     {
-        await using var factory = await SqliteBakeryDbFactory.CreateAsync();
-        var flourId = await SeedIngredientAsync(factory, "Flour", "kg");
+        await using var factory = await PostgresBakeryDbFactory.CreateAsync(_fixture.ConnectionString);
+        var (flourId, _) = await SeedIngredientAsync(factory, "Flour", "kg");
         var service = new ProductService(factory);
 
         var created = await service.CreateAsync(new ProductInput
         {
-            Name = "Baguette",
+            Name = UniqueName("Baguette"),
             Category = "Bread",
             BatchYield = 10,
             Price = 3.25m
@@ -403,13 +423,13 @@ public sealed class ProductServiceTests
     public async Task UpdateRecipeIngredientQuantityAsync_QuantityBelowMinimum_RejectsAndPreservesSavedQuantity(
         decimal invalidQuantity)
     {
-        await using var factory = await SqliteBakeryDbFactory.CreateAsync();
-        var flourId = await SeedIngredientAsync(factory, "Flour", "kg");
+        await using var factory = await PostgresBakeryDbFactory.CreateAsync(_fixture.ConnectionString);
+        var (flourId, _) = await SeedIngredientAsync(factory, "Flour", "kg");
         var service = new ProductService(factory);
 
         var created = await service.CreateAsync(new ProductInput
         {
-            Name = "Baguette",
+            Name = UniqueName("Baguette"),
             Category = "Bread",
             BatchYield = 10,
             Price = 3.25m,
@@ -437,15 +457,15 @@ public sealed class ProductServiceTests
     [InlineData(0.0009)]
     public async Task SaveRecipeAsync_QuantityBelowMinimum_RejectsAndPreservesSavedRecipe(decimal invalidQuantity)
     {
-        await using var factory = await SqliteBakeryDbFactory.CreateAsync();
-        var flourId = await SeedIngredientAsync(factory, "Flour", "kg");
-        var butterId = await SeedIngredientAsync(factory, "Butter", "kg");
-        var sugarId = await SeedIngredientAsync(factory, "Sugar", "kg");
+        await using var factory = await PostgresBakeryDbFactory.CreateAsync(_fixture.ConnectionString);
+        var (flourId, _) = await SeedIngredientAsync(factory, "Flour", "kg");
+        var (butterId, _) = await SeedIngredientAsync(factory, "Butter", "kg");
+        var (sugarId, _) = await SeedIngredientAsync(factory, "Sugar", "kg");
         var service = new ProductService(factory);
 
         var created = await service.CreateAsync(new ProductInput
         {
-            Name = "Butter Cookie",
+            Name = UniqueName("Butter Cookie"),
             Category = "Cookies",
             BatchYield = 24,
             Price = 1.50m,
@@ -486,14 +506,14 @@ public sealed class ProductServiceTests
     [Fact]
     public async Task RecipeUpdateOperations_QuantityAtMinimum_PersistExpectedValue()
     {
-        await using var factory = await SqliteBakeryDbFactory.CreateAsync();
-        var saltId = await SeedIngredientAsync(factory, "Sea Salt", "kg");
-        var yeastId = await SeedIngredientAsync(factory, "Yeast", "kg");
+        await using var factory = await PostgresBakeryDbFactory.CreateAsync(_fixture.ConnectionString);
+        var (saltId, _) = await SeedIngredientAsync(factory, "Sea Salt", "kg");
+        var (yeastId, _) = await SeedIngredientAsync(factory, "Yeast", "kg");
         var service = new ProductService(factory);
 
         var created = await service.CreateAsync(new ProductInput
         {
-            Name = "Country Loaf",
+            Name = UniqueName("Country Loaf"),
             Category = "Bread",
             BatchYield = 4,
             Price = 6.00m
@@ -535,18 +555,19 @@ public sealed class ProductServiceTests
     [Fact]
     public async Task DeleteAsync_ProductWithRecipeAndNoProduction_CascadesRecipeAndKeepsIngredients()
     {
-        await using var factory = await SqliteBakeryDbFactory.CreateAsync();
-        var flourId = await SeedIngredientAsync(factory, "Flour", "kg");
+        await using var factory = await PostgresBakeryDbFactory.CreateAsync(_fixture.ConnectionString);
+        var (flourId, _) = await SeedIngredientAsync(factory, "Flour", "kg");
         var service = new ProductService(factory);
 
         var created = await service.CreateAsync(new ProductInput
         {
-            Name = "Cinnamon Roll",
+            Name = UniqueName("Cinnamon Roll"),
             Category = "Pastry",
             BatchYield = 12,
             Price = 3.75m,
             RecipeIngredients = [new RecipeIngredientInput { IngredientId = flourId, QuantityRequired = 1.5m }]
         });
+        Assert.True(created.Success);
 
         var deleteResult = await service.DeleteAsync(created.Value);
 
@@ -554,25 +575,26 @@ public sealed class ProductServiceTests
         Assert.Null(await service.GetByIdAsync(created.Value));
 
         await using var db = await factory.CreateDbContextAsync();
-        Assert.Empty(await db.RecipeIngredients.ToListAsync());
+        Assert.Empty(await db.RecipeIngredients.Where(r => r.ProductId == created.Value).ToListAsync());
         Assert.True(await db.Ingredients.AnyAsync(i => i.Id == flourId));
     }
 
     [Fact]
     public async Task DeleteAsync_ProductWithProductionRecords_IsBlockedAndPreservesData()
     {
-        await using var factory = await SqliteBakeryDbFactory.CreateAsync();
-        var flourId = await SeedIngredientAsync(factory, "Flour", "kg");
+        await using var factory = await PostgresBakeryDbFactory.CreateAsync(_fixture.ConnectionString);
+        var (flourId, _) = await SeedIngredientAsync(factory, "Flour", "kg");
         var service = new ProductService(factory);
 
         var created = await service.CreateAsync(new ProductInput
         {
-            Name = "Muffin",
+            Name = UniqueName("Muffin"),
             Category = "Muffins & Scones",
             BatchYield = 12,
             Price = 2.50m,
             RecipeIngredients = [new RecipeIngredientInput { IngredientId = flourId, QuantityRequired = 0.8m }]
         });
+        Assert.True(created.Success);
 
         await using (var db = await factory.CreateDbContextAsync())
         {
